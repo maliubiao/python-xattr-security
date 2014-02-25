@@ -8,21 +8,29 @@ PyDoc_STRVAR(xattr_setxattr_doc, "call setxattr");
 static PyObject *
 xattr_setxattr(PyObject *object, PyObject *args)
 {
+	PyObject *value;
 	char *path;
-	char *name;
-	char *value;
-	int flags;
+	char *name; 
+	unsigned flags;
 	int ret;
 
-	if (!PyArg_ParseTuple(args, "sssl:setxattr", &path, &name, &value, &flags)) {
+	if (!PyArg_ParseTuple(args, "ssOl:setxattr", &path, &name, &value, &flags)) {
 		return NULL;
-	}
-	ret = setxattr(path, name, value, strlen(value), flags);
+	} 
+	if (!PyString_Check(value)) {
+		goto check_failed; 
+	} 
+	ret = setxattr(path, name, PyString_AS_STRING(value), PyString_GET_SIZE(value), flags); 
 	if (ret < 0) {
-		PyErr_SetFromErrno(PyExc_OSError);
-		return NULL;
+		goto ret_failed;
 	}
 	Py_RETURN_NONE; 
+check_failed: 
+	PyErr_SetString(PyExc_TypeError, "value: need a str");
+	return NULL;
+ret_failed:
+	PyErr_SetFromErrno(PyExc_OSError);
+	return NULL;
 }
 
 
@@ -32,20 +40,30 @@ PyDoc_STRVAR(xattr_lsetxattr_doc, "call lsetxattr");
 static PyObject *
 xattr_lsetxattr(PyObject *object, PyObject *args)
 {
+	PyObject *value;
 	char *path;
-	char *name;
-	char *value;
-	int flags;
+	char *name; 
+	unsigned flags;
 	int ret;
-	if (!PyArg_ParseTuple(args, "sssl:lsetxattr", &path, &name, &value, &flags)) {
+
+	if (!PyArg_ParseTuple(args, "ssOl:setxattr", &path, &name, &value, &flags)) {
 		return NULL;
-	}
-	ret = lsetxattr(path, name, value, strlen(value), flags);
+	} 
+	if (!PyString_Check(value)) {
+		goto check_failed;
+
+	} 
+	ret = lsetxattr(path, name, PyString_AS_STRING(value), PyString_GET_SIZE(value), flags);
 	if (ret < 0) {
-		PyErr_SetFromErrno(PyExc_OSError);
-		return NULL;
+		goto ret_failed;
 	}
 	Py_RETURN_NONE; 
+check_failed:
+	PyErr_SetString(PyExc_TypeError, "value: need a str");
+	return NULL;
+ret_failed: 
+	PyErr_SetFromErrno(PyExc_OSError);
+	return NULL;
 }
 
 PyDoc_STRVAR(xattr_fsetxattr_doc, "call fsetxattr"); 
@@ -53,20 +71,29 @@ PyDoc_STRVAR(xattr_fsetxattr_doc, "call fsetxattr");
 static PyObject *
 xattr_fsetxattr(PyObject *object, PyObject *args)
 {
+	PyObject *value;
 	int fd;
-	char *name;
-	char *value;
-	int flags;
+	char *name; 
+	unsigned flags;
 	int ret;
-	if (!PyArg_ParseTuple(args, "issl:fsetxattr", &fd, &name, &value, &flags)) {
+
+	if (!PyArg_ParseTuple(args, "ssOl:setxattr", &fd, &name, &value, &flags)) {
 		return NULL;
-	}
-	ret = fsetxattr(fd, name, value, strlen(value), flags);
+	} 
+	if (!PyString_Check(value)) {
+		goto check_failed;
+	} 
+	ret = fsetxattr(fd, name, PyString_AS_STRING(value), PyString_GET_SIZE(value), flags);
 	if (ret < 0) {
-		PyErr_SetFromErrno(PyExc_OSError);
-		return NULL;
+		goto ret_failed;
 	}
 	Py_RETURN_NONE; 
+check_failed:
+	PyErr_SetString(PyExc_TypeError, "value: need a str");
+	return NULL;
+ret_failed: 
+	PyErr_SetFromErrno(PyExc_OSError);
+	return NULL; 
 }
 
 
@@ -77,7 +104,9 @@ xattr_listxattr(PyObject *object, PyObject *args)
 {
 	char *path; 
 	char *buf;
-	int ret; 
+	PyObject *ret; 
+	int xattr_ret;
+
 	if (!PyArg_ParseTuple(args, "s:listxattr", &path)) {
 		return NULL;
 	} 
@@ -85,11 +114,13 @@ xattr_listxattr(PyObject *object, PyObject *args)
 	if (!buf) {
 		goto failed;
 	}
-	ret = listxattr(path, buf, XATTR_BUF_SIZE);
-	if (ret < 0) {
+	xattr_ret = listxattr(path, buf, XATTR_BUF_SIZE);
+	if (xattr_ret < 0) {
 		goto free_buf;
-	}
-	return PyString_FromStringAndSize(buf, ret);
+	} 
+	ret = PyString_FromStringAndSize(buf, xattr_ret); 
+	PyMem_Free(buf);
+	return ret;
 free_buf:
 	PyMem_Free(buf);
 failed:
@@ -107,7 +138,9 @@ xattr_llistxattr(PyObject *object, PyObject *args)
 {
 	char *path; 
 	char *buf;
-	int ret; 
+	PyObject *ret; 
+	int xattr_ret;
+
 	if (!PyArg_ParseTuple(args, "s:llistxattr", &path)) {
 		return NULL;
 	} 
@@ -115,11 +148,13 @@ xattr_llistxattr(PyObject *object, PyObject *args)
 	if (!buf) {
 		goto failed;
 	}
-	ret = llistxattr(path, buf, XATTR_BUF_SIZE);
-	if (ret < 0) {
+	xattr_ret = llistxattr(path, buf, XATTR_BUF_SIZE);
+	if (xattr_ret < 0) {
 		goto free_buf;
 	} 
-	return PyString_FromStringAndSize(buf, ret);
+	ret = PyString_FromStringAndSize(buf, xattr_ret);
+	PyMem_Free(buf);
+	return ret;
 free_buf:
 	PyMem_Free(buf);
 failed:
@@ -137,7 +172,9 @@ xattr_flistxattr(PyObject *object, PyObject *args)
 {
 	int fd ; 
 	char *buf;
-	int ret; 
+	PyObject *ret; 
+	int xattr_ret;
+
 	if (!PyArg_ParseTuple(args, "i:flistxattr", &fd)) {
 		return NULL;
 	} 
@@ -145,11 +182,13 @@ xattr_flistxattr(PyObject *object, PyObject *args)
 	if (!buf) {
 		goto failed;
 	}
-	ret = flistxattr(fd, buf, XATTR_BUF_SIZE);
-	if (ret < 0) {
+	xattr_ret = flistxattr(fd, buf, XATTR_BUF_SIZE);
+	if (xattr_ret < 0) {
 		goto free_buf;
 	} 
-	return PyString_FromStringAndSize(buf, ret); 
+	ret = PyString_FromStringAndSize(buf, xattr_ret); 
+	PyMem_Free(buf);
+	return ret;
 free_buf:
 	PyMem_Free(buf);
 failed:
@@ -226,7 +265,8 @@ xattr_getxattr(PyObject *object, PyObject *args)
 	char *path;
 	char *name;
 	char *buf;
-	int ret;
+	PyObject *ret;
+	int xattr_ret;
 
 	if (!PyArg_ParseTuple(args, "ss:getxattr", &path, &name)) {
 		return NULL;
@@ -236,11 +276,13 @@ xattr_getxattr(PyObject *object, PyObject *args)
 		goto failed;
 	}
 	memset(buf, 0, XATTR_BUF_SIZE);
-	ret = getxattr(path, name, buf, XATTR_BUF_SIZE - 1);
-	if (ret < 0) {
+	xattr_ret = getxattr(path, name, buf, XATTR_BUF_SIZE - 1);
+	if (xattr_ret < 0) {
 		goto free_buf;
 	}
-	return PyString_FromStringAndSize(buf, ret);
+	ret = PyString_FromStringAndSize(buf, xattr_ret);
+	PyMem_Free(buf);
+	return ret;
 free_buf:
 	PyMem_Free(buf);
 failed:
@@ -259,7 +301,9 @@ xattr_lgetxattr(PyObject *object, PyObject *args)
 	char *path;
 	char *name;
 	char *buf;
-	int ret;
+	PyObject *ret;
+	int xattr_ret;
+
 	if (!PyArg_ParseTuple(args, "ss:lgetxattr", &path, &name)) {
 		return NULL;
 	}
@@ -268,11 +312,13 @@ xattr_lgetxattr(PyObject *object, PyObject *args)
 		goto failed;
 	}
 	memset(buf, 0, XATTR_BUF_SIZE);
-	ret = lgetxattr(path, name, buf, XATTR_BUF_SIZE - 1);
+	xattr_ret = lgetxattr(path, name, buf, XATTR_BUF_SIZE - 1);
 	if (ret < 0) {
 		goto free_buf;
 	}
-	return PyString_FromStringAndSize(buf, ret);
+	ret = PyString_FromStringAndSize(buf, xattr_ret);
+	PyMem_Free(buf);
+	return ret; 
 free_buf:
 	PyMem_Free(buf);
 failed:
@@ -290,7 +336,8 @@ xattr_fgetxattr(PyObject *object, PyObject *args)
 	int fd;
 	char *name;
 	char *buf;
-	int ret;
+	PyObject *ret;
+	int xattr_ret;
 
 	if (!PyArg_ParseTuple(args, "is:fgetxattr", &fd, &name)) {
 		return NULL;
@@ -300,11 +347,13 @@ xattr_fgetxattr(PyObject *object, PyObject *args)
 		goto failed;
 	}
 	memset(buf, 0, XATTR_BUF_SIZE);
-	ret = fgetxattr(fd, name, buf, XATTR_BUF_SIZE - 1);
+	xattr_ret = fgetxattr(fd, name, buf, XATTR_BUF_SIZE - 1);
 	if (ret < 0) {
 		goto free_buf;
 	}
-	return PyString_FromStringAndSize(buf, ret);
+	ret = PyString_FromStringAndSize(buf, xattr_ret);
+	PyMem_Free(buf);
+	return ret; 
 free_buf:
 	PyMem_Free(buf);
 failed:

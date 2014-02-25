@@ -2,7 +2,8 @@
 from distutils.core import setup, Extension
 
 m = Extension("xattr",
-        sources=["xattr.c"])
+        sources=["xattr.c"],
+        )
         
 
 setup(name = "xattr",

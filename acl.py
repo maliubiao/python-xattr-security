@@ -4,9 +4,9 @@ import pdb
 import pwd, grp
 from cStringIO import StringIO
 
-POSIX_ACL_XATTR_ACCESS = "system.posix_acl_access"
-POSIX_ACL_XATTR_DEFAULT = "system.posix_acl_default"
-POSIX_ACL_XATTR_VERSION = 0x2
+XATTR_ACCESS = "system.posix_acl_access"
+XATTR_DEFAULT = "system.posix_acl_default"
+XATTR_VERSION = 0x2
 
 ACL_TYPE_ACCESS = 0x8000
 ACL_TYPE_DEFAULT = 0x4000
@@ -61,11 +61,18 @@ def write_acl(path, acl_type, acl_tuple):
     #write entries
     for e in entries:
         buf.write(acl_entry_to_xattr(e))        
-    pdb.set_trace()
-    xattr.setxattr(path, acl_type, buf.getvalue()) 
-    buf.close()
+    final = buf.getvalue()
+    buf.close() 
+    try: 
+        #replace
+        xattr.getxattr(path, acl_type)
+        xattr.setxattr(path, acl_type, final, xattr.XATTR_REPLACE) 
+    except:
+        #create
+        xattr.setxattr(path, acl_type, final, xattr.XATTR_CREATE) 
+   
 
-def translate_read_acl(acl_entries):
+def entries_to_descr(acl_entries):
     ret = []
     for e in acl_entries:
         tag_type, perm, eid = e 
@@ -94,7 +101,7 @@ def translate_read_acl(acl_entries):
         ret.append((tag_name, name, perm_ret))
     return ",".join([":".join(x) for x in ret])
         
-def translate_write_acl(acl_str):
+def descr_to_entries(acl_str):
     ret = []
     for spec in acl_str.split(","):
         tag_name, eid, perm = spec.split(":")
