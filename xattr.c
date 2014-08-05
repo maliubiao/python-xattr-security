@@ -3,31 +3,29 @@
 
 #define XATTR_BUF_SIZE  1024
 
+
+
 PyDoc_STRVAR(xattr_setxattr_doc, "call setxattr");
 
 static PyObject *
 xattr_setxattr(PyObject *object, PyObject *args)
 {
-	PyObject *value;
+	char *value;
 	char *path;
 	char *name; 
 	unsigned flags;
 	int ret;
+	int vlen;
 
-	if (!PyArg_ParseTuple(args, "ssOl:setxattr", &path, &name, &value, &flags)) {
+	if (!PyArg_ParseTuple(args, "sss#l:setxattr", &path, &name, &value, &vlen, &flags)) {
 		return NULL;
 	} 
-	if (!PyString_Check(value)) {
-		goto check_failed; 
-	} 
-	ret = setxattr(path, name, PyString_AS_STRING(value), PyString_GET_SIZE(value), flags); 
+	ret = setxattr(path, name, value, vlen, flags); 
 	if (ret < 0) {
 		goto ret_failed;
 	}
 	Py_RETURN_NONE; 
-check_failed: 
-	PyErr_SetString(PyExc_TypeError, "value: need a str");
-	return NULL;
+
 ret_failed:
 	PyErr_SetFromErrno(PyExc_OSError);
 	return NULL;
@@ -40,27 +38,21 @@ PyDoc_STRVAR(xattr_lsetxattr_doc, "call lsetxattr");
 static PyObject *
 xattr_lsetxattr(PyObject *object, PyObject *args)
 {
-	PyObject *value;
+	char *value;
 	char *path;
 	char *name; 
 	unsigned flags;
 	int ret;
+	int vlen;
 
-	if (!PyArg_ParseTuple(args, "ssOl:setxattr", &path, &name, &value, &flags)) {
+	if (!PyArg_ParseTuple(args, "sss#l:setxattr", &path, &name, &value, &vlen, &flags)) {
 		return NULL;
 	} 
-	if (!PyString_Check(value)) {
-		goto check_failed;
-
-	} 
-	ret = lsetxattr(path, name, PyString_AS_STRING(value), PyString_GET_SIZE(value), flags);
+	ret = lsetxattr(path, name, value, vlen, flags);
 	if (ret < 0) {
 		goto ret_failed;
 	}
 	Py_RETURN_NONE; 
-check_failed:
-	PyErr_SetString(PyExc_TypeError, "value: need a str");
-	return NULL;
 ret_failed: 
 	PyErr_SetFromErrno(PyExc_OSError);
 	return NULL;
@@ -71,26 +63,22 @@ PyDoc_STRVAR(xattr_fsetxattr_doc, "call fsetxattr");
 static PyObject *
 xattr_fsetxattr(PyObject *object, PyObject *args)
 {
-	PyObject *value;
+	char *value;
 	int fd;
 	char *name; 
 	unsigned flags;
 	int ret;
+	int vlen;
 
-	if (!PyArg_ParseTuple(args, "ssOl:setxattr", &fd, &name, &value, &flags)) {
+	if (!PyArg_ParseTuple(args, "sss#l:setxattr", &fd, &name, &value, &vlen, &flags)) {
 		return NULL;
 	} 
-	if (!PyString_Check(value)) {
-		goto check_failed;
-	} 
-	ret = fsetxattr(fd, name, PyString_AS_STRING(value), PyString_GET_SIZE(value), flags);
+	ret = fsetxattr(fd, name, value, vlen, flags);
 	if (ret < 0) {
 		goto ret_failed;
 	}
 	Py_RETURN_NONE; 
-check_failed:
-	PyErr_SetString(PyExc_TypeError, "value: need a str");
-	return NULL;
+
 ret_failed: 
 	PyErr_SetFromErrno(PyExc_OSError);
 	return NULL; 
@@ -276,7 +264,7 @@ xattr_getxattr(PyObject *object, PyObject *args)
 		goto failed;
 	}
 	memset(buf, 0, XATTR_BUF_SIZE);
-	xattr_ret = getxattr(path, name, buf, XATTR_BUF_SIZE - 1);
+	xattr_ret = getxattr(path, name, buf, XATTR_BUF_SIZE);
 	if (xattr_ret < 0) {
 		goto free_buf;
 	}
@@ -312,7 +300,7 @@ xattr_lgetxattr(PyObject *object, PyObject *args)
 		goto failed;
 	}
 	memset(buf, 0, XATTR_BUF_SIZE);
-	xattr_ret = lgetxattr(path, name, buf, XATTR_BUF_SIZE - 1);
+	xattr_ret = lgetxattr(path, name, buf, XATTR_BUF_SIZE);
 	if (ret < 0) {
 		goto free_buf;
 	}
@@ -347,7 +335,7 @@ xattr_fgetxattr(PyObject *object, PyObject *args)
 		goto failed;
 	}
 	memset(buf, 0, XATTR_BUF_SIZE);
-	xattr_ret = fgetxattr(fd, name, buf, XATTR_BUF_SIZE - 1);
+	xattr_ret = fgetxattr(fd, name, buf, XATTR_BUF_SIZE);
 	if (ret < 0) {
 		goto free_buf;
 	}
@@ -388,7 +376,7 @@ static PyMethodDef xattr_methods[] = {
 		METH_VARARGS, xattr_getxattr_doc},
 	{"lgetxattr", (PyCFunction)xattr_lgetxattr,
 		METH_VARARGS, xattr_lgetxattr_doc},
-	{"fgetxattr", (PyCFunction)xattr_fgetxattr,
+	{"fgetxattr", (PyCFunction)xattr_fgetxattr, 
 		METH_VARARGS, xattr_fgetxattr_doc}, 
 	{NULL, NULL, 0, NULL}
 };
