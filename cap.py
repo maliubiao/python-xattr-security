@@ -1,4 +1,8 @@
+# !/usr/bin/env python
 import xattr
+import struct
+import sys
+import pdb
 from cStringIO import StringIO
 
 XATTR_CAP = "security.capability" 
@@ -290,8 +294,9 @@ CAP_LAST_CAP = CAP_BLOCK_SUSPEND
 
 #v1, v2 is too old and deprecated.  
 #magic
-CAP_V3 = 0x20080522 
-CAP_U32S_3 = 2 
+
+VFS_CAP_REVISION_2 = 0x02000000
+
 
 #if flag valid
 cap_valid = lambda x: (x >= 0) and (x <= CAP_LAST_CAP) 
@@ -348,20 +353,21 @@ cap_dict = {
         }
 
 def read_cap(path):
-    cap_data = xattr.getxattr(path, XATTR_CAP)
+    cap_data = xattr.getxattr(path, XATTR_CAP) 
     magic = struct.unpack("<I", cap_data[:4])[0] 
-    if magic != CAP_V3:
+    if magic != VFS_CAP_REVISION_2:
         raise Exception("cap v3 only")
     #little endian, 64bit
+
     perm = struct.unpack("<Q", cap_data[4:12])[0]
     inhert = struct.unpack("<Q", cap_data[12:])[0]
     return (perm, inhert)
 
-def write_cap(path, capset, is_effective=False): 
+def write_cap(path, capset, is_effective=True): 
     perm, inhert = capset
     cap_data = StringIO()
     #magic
-    magic = CAP_V3
+    magic = VFS_CAP_REVISION_2
     if is_effective:
         magic |= CAP_EFFECTIVE 
     cap_data.write(struct.pack("<I", magic))
@@ -369,9 +375,12 @@ def write_cap(path, capset, is_effective=False):
     cap_data.write(struct.pack("<Q", perm))
     #inhert
     cap_data.write(struct.pack("<Q", inhert))
-    data = cap_data.getvalue()
-    cap_data.close()
-    cap_data = xattr.setxattr(path, XATTR_CAP, data)
+    data = cap_data.getvalue() 
+    cap_data.close() 
+    try:
+        xattr.setxattr(path, XATTR_CAP, data, xattr.XATTR_CREATE) 
+    except OSError:
+        xattr.setxattr(path, XATTR_CAP, data, xattr.XATTR_REPLACE) 
 
 def print_usage():
     print "capset executable description"
@@ -381,14 +390,15 @@ def main():
     if len(args) < 2:
         print_usage()
         exit()
-    ex, descr = args
+    ex= args[1]
+    descr = args[2] 
     perm = 0
     inhert = 0
-    #format perm:cap1,cap2..|inhert=cap1,..
+    #format perm=cap1,cap2..|inhert=cap1,..
     for k in descr.split("|"):
         name, cap = k.split("=")
         for j in cap.split(","):
-            if name == "perm":
+            if name == "perm": 
                 perm = cap_add(perm, cap_dict[j])
             elif name == "inhert":
                 inhert = cap_add(inhert, cap_dict[j])
